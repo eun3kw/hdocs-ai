@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HDocs AI 질문답변</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #F7F8FA;
+    --surface: #FFFFFF;
+    --border: #E4E7ED;
+    --accent: #2563EB;
+    --accent-light: #EFF4FF;
+    --text-primary: #111827;
+    --text-secondary: #6B7280;
+    --text-muted: #9CA3AF;
+    --success: #059669;
+    --warning: #D97706;
+    --error: #DC2626;
+    --radius: 10px;
+    --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  }
+
+  body {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 14px; font-weight: 600;
+  }
+  .logo-text { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+  .logo-sub { font-size: 13px; color: var(--text-muted); margin-left: 4px; }
+
+  #status-badge {
+    font-size: 12px; font-weight: 500;
+    padding: 4px 10px; border-radius: 20px;
+    background: #FEF3C7; color: #92400E;
+    display: flex; align-items: center; gap: 5px;
+  }
+  #status-badge.ready { background: #D1FAE5; color: #065F46; }
+  #status-badge.loading { background: #EFF4FF; color: #1D4ED8; }
+  #status-badge .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor;
+  }
+
+  /* ── Layout ── */
+  .layout {
+    display: flex;
+    flex: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 24px 20px;
+    gap: 20px;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 16px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .card-body { padding: 14px 16px; }
+
+  label { display: block; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 5px; }
+
+  input[type="text"], input[type="password"], textarea, select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 8px 11px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type="text"]:focus, input[type="password"]:focus, textarea:focus, select:focus {
+    border-color: var(--accent);
+    background: white;
+  }
+  input[type="password"] { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.05em; }
+
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+
+  .hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; padding: 9px 14px;
+    border: none; border-radius: 7px;
+    font-size: 13px; font-weight: 500; font-family: inherit;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #1D4ED8; }
+  .btn-primary:disabled { background: #93C5FD; cursor: not-allowed; }
+  .btn-outline {
+    background: white; color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .btn-outline:hover { background: var(--bg); }
+
+  /* ── Doc list ── */
+  #doc-list {
+    max-height: 220px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .doc-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 7px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+  .doc-item .doc-icon { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+  .doc-item.loaded { color: var(--success); background: #F0FDF4; }
+  .doc-item.failed { color: var(--error); background: #FEF2F2; }
+  .doc-item.loading-item { color: var(--accent); }
+  #doc-count { font-size: 12px; color: var(--text-muted); padding: 8px 0 4px; text-align: center; }
+
+  /* ── Main ── */
+  .main { flex: 1; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+  /* ── Chat ── */
+  #chat-area {
+    flex: 1;
+    min-height: 400px;
+    max-height: 560px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .empty-state {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; color: var(--text-muted); gap: 10px;
+    padding: 40px 0;
+  }
+  .empty-icon { font-size: 36px; opacity: 0.4; }
+  .empty-title { font-size: 15px; font-weight: 500; color: var(--text-secondary); }
+  .empty-desc { font-size: 13px; line-height: 1.6; max-width: 280px; }
+
+  .message { display: flex; gap: 10px; align-items: flex-start; }
+  .message.user { flex-direction: row-reverse; }
+
+  .msg-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; flex-shrink: 0;
+  }
+  .message.user .msg-avatar { background: var(--accent); color: white; }
+  .message.ai .msg-avatar { background: #F3F4F6; color: var(--text-secondary); border: 1px solid var(--border); }
+
+  .msg-bubble {
+    max-width: 80%;
+    padding: 11px 14px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .message.user .msg-bubble {
+    background: var(--accent);
+    color: white;
+    border-bottom-right-radius: 3px;
+  }
+  .message.ai .msg-bubble {
+    background: var(--bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 3px;
+  }
+
+  .msg-bubble p { margin-bottom: 8px; }
+  .msg-bubble p:last-child { margin-bottom: 0; }
+  .msg-bubble strong { font-weight: 600; }
+  .msg-bubble ul, .msg-bubble ol { padding-left: 18px; margin: 6px 0; }
+  .msg-bubble li { margin-bottom: 3px; }
+  .msg-bubble code {
+    background: rgba(0,0,0,0.07); padding: 1px 5px;
+    border-radius: 4px; font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .message.user .msg-bubble code { background: rgba(255,255,255,0.2); }
+
+  .typing-indicator {
+    display: flex; gap: 5px; align-items: center; padding: 4px 0;
+  }
+  .typing-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--text-muted);
+    animation: bounce 1.2s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-5px); opacity: 1; }
+  }
+
+  /* ── Input area ── */
+  .input-area {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px 16px;
+  }
+  .input-row { display: flex; gap: 10px; align-items: flex-end; }
+  #question-input {
+    flex: 1; resize: none; min-height: 42px; max-height: 120px;
+    border-radius: 8px; line-height: 1.6; font-size: 14px;
+    overflow-y: auto;
+  }
+  #send-btn {
+    width: 42px; height: 42px; flex-shrink: 0;
+    background: var(--accent); border: none; border-radius: 8px;
+    color: white; cursor: pointer; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  #send-btn:hover { background: #1D4ED8; }
+  #send-btn:disabled { background: #93C5FD; cursor: not-allowed; }
+  .input-hint {
+    font-size: 11px; color: var(--text-muted); margin-top: 8px;
+    display: flex; justify-content: space-between;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #1F2937; color: white;
+    padding: 10px 18px; border-radius: 8px;
+    font-size: 13px; opacity: 0;
+    transition: all 0.25s; pointer-events: none; z-index: 999;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.error { background: var(--error); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo-icon">H</div>
+    <span class="logo-text">HDocs AI</span>
+    <span class="logo-sub">— EG 컬렉션 기반 질문답변</span>
+  </div>
+  <div id="status-badge">
+    <span class="dot"></span>
+    <span id="status-text">설정 필요</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+
+    <!-- API 설정 -->
+    <div class="card">
+      <div class="card-header">🔑 API 설정</div>
+      <div class="card-body">
+        <div class="field">
+          <label>HDocs URL</label>
+          <input type="text" id="hdocs-url" placeholder="https://hdocs.oilbank.co.kr" value="https://hdocs.oilbank.co.kr">
+        </div>
+        <div class="field">
+          <label>HDocs API 키</label>
+          <input type="password" id="hdocs-key" placeholder="ol_api_...">
+          <div class="hint">HDocs → 설정 → API & Access</div>
+        </div>
+        <div class="field">
+          <label>Claude API 키</label>
+          <input type="password" id="claude-key" placeholder="sk-ant-...">
+          <div class="hint">console.anthropic.com</div>
+        </div>
+        <button class="btn btn-primary" id="load-btn" onclick="loadDocs()">
+          📥 문서 불러오기
+        </button>
+      </div>
+    </div>
+
+    <!-- 불러온 문서 목록 -->
+    <div class="card">
+      <div class="card-header">📄 불러온 문서</div>
+      <div class="card-body" style="padding: 10px 12px;">
+        <div id="doc-list">
+          <div class="empty-state" style="padding: 20px 0; gap: 6px;">
+            <div style="font-size: 24px; opacity: 0.3;">📂</div>
+            <div style="font-size: 12px; color: var(--text-muted);">문서를 불러오면<br>여기에 표시돼요</div>
+          </div>
+        </div>
+        <div id="doc-count"></div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Chat -->
+    <div id="chat-area">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">💬</div>
+        <div class="empty-title">HDocs 문서 기반 AI 질문답변</div>
+        <div class="empty-desc">왼쪽에서 API 키를 입력하고<br>문서를 불러온 뒤 질문해보세요.</div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="input-area">
+      <div class="input-row">
+        <textarea id="question-input" placeholder="EG 문서 내용을 바탕으로 질문해보세요..." rows="1"
+          oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+        <button id="send-btn" onclick="sendQuestion()" disabled>↑</button>
+      </div>
+      <div class="input-hint">
+        <span>Enter로 전송 · Shift+Enter로 줄바꿈</span>
+        <span id="doc-status-hint">문서 미로드</span>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  // ── State ──
+  let loadedDocs = [];
+  let chatHistory = [];
+  let isLoading = false;
+
+  // ── Auto resize textarea ──
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendQuestion();
+    }
+  }
+
+  // ── Toast ──
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'show' + (type ? ' ' + type : '');
+    setTimeout(() => t.className = '', 2800);
+  }
+
+  // ── Status ──
+  function setStatus(text, state = '') {
+    const badge = document.getElementById('status-badge');
+    const label = document.getElementById('status-text');
+    badge.className = state;
+    label.textContent = text;
+  }
+
+  // ── Load Docs ──
+  async function loadDocs() {
+    const baseUrl = document.getElementById('hdocs-url').value.trim().replace(/\/$/, '');
+    const hdocsKey = document.getElementById('hdocs-key').value.trim();
+    const claudeKey = document.getElementById('claude-key').value.trim();
+
+    if (!hdocsKey || !claudeKey) {
+      showToast('API 키를 모두 입력해주세요', 'error');
+      return;
+    }
+
+    const btn = document.getElementById('load-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 불러오는 중...';
+    setStatus('문서 로딩 중', 'loading');
+    loadedDocs = [];
+
+    const docList = document.getElementById('doc-list');
+    docList.innerHTML = '';
+
+    try {
+      // 1. 컬렉션 목록 가져오기
+      const colRes = await fetch(`${baseUrl}/api/collections.list`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${hdocsKey}`
+        },
+        body: JSON.stringify({ limit: 100 })
+      });
+
+      if (!colRes.ok) throw new Error(`HDocs 연결 실패 (${colRes.status}) — API 키나 URL을 확인해주세요`);
+
+      const colData = await colRes.json();
+      const collections = colData.data || [];
+
+      // EG 컬렉션 찾기 (이름에 EG 포함하는 것 모두)
+      const egCols = collections.filter(c =>
+        c.name.toUpperCase().includes('EG') || c.name === 'EG'
+      );
+
+      if (egCols.length === 0) {
+        // EG 없으면 전체 컬렉션 사용
+        egCols.push(...collections);
+      }
+
+      // 2. 각 컬렉션의 문서 목록 가져오기
+      for (const col of egCols) {
+        const docsRes = await fetch(`${baseUrl}/api/documents.list`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${hdocsKey}`
+          },
+          body: JSON.stringify({ collectionId: col.id, limit: 100 })
+        });
+
+        if (!docsRes.ok) continue;
+        const docsData = await docsRes.json();
+        const docs = docsData.data || [];
+
+        // 3. 각 문서 내용 가져오기
+        for (const doc of docs) {
+          const item = document.createElement('div');
+          item.className = 'doc-item loading-item';
+          item.innerHTML = `<span class="doc-icon">⏳</span><span>${doc.title}</span>`;
+          docList.appendChild(item);
+
+          try {
+            const docRes = await fetch(`${baseUrl}/api/documents.info`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${hdocsKey}`
+              },
+              body: JSON.stringify({ id: doc.id })
+            });
+
+            if (!docRes.ok) throw new Error();
+            const docData = await docRes.json();
+            const content = docData.data?.text || '';
+
+            loadedDocs.push({
+              title: doc.title,
+              collection: col.name,
+              content: content
+            });
+
+            item.className = 'doc-item loaded';
+            item.innerHTML = `<span class="doc-icon">✅</span><span>${doc.title}</span>`;
+          } catch {
+            item.className = 'doc-item failed';
+            item.innerHTML = `<span class="doc-icon">⚠️</span><span>${doc.title}</span>`;
+          }
+        }
+      }
+
+      const count = loadedDocs.length;
+      document.getElementById('doc-count').textContent = `총 ${count}개 문서 로드 완료`;
+
+      if (count > 0) {
+        setStatus(`${count}개 문서 준비됨`, 'ready');
+        document.getElementById('send-btn').disabled = false;
+        document.getElementById('doc-status-hint').textContent = `${count}개 문서 참고 중`;
+        showToast(`✅ ${count}개 문서를 불러왔어요! 이제 질문해보세요.`);
+
+        // 첫 안내 메시지
+        if (chatHistory.length === 0) {
+          addMessage('ai', `**EG 컬렉션 문서 ${count}개**를 모두 불러왔어요 📚\n\n문서 내용을 바탕으로 무엇이든 질문해보세요. 예를 들어:\n- "월초실적 업무 절차가 어떻게 되나요?"\n- "Plant value란 무엇인가요?"\n- "Crude Balance 업무 방법을 알려줘"`);
+        }
+      } else {
+        setStatus('문서 없음', '');
+        showToast('불러온 문서가 없어요. API 키를 확인해주세요', 'error');
+      }
+
+    } catch (err) {
+      setStatus('연결 실패', '');
+      showToast(err.message || '문서 불러오기 실패', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔄 다시 불러오기';
+    }
+  }
+
+  // ── Send Question ──
+  async function sendQuestion() {
+    if (isLoading) return;
+
+    const input = document.getElementById('question-input');
+    const question = input.value.trim();
+    if (!question) return;
+
+    if (loadedDocs.length === 0) {
+      showToast('먼저 문서를 불러와주세요', 'error');
+      return;
+    }
+
+    const claudeKey = document.getElementById('claude-key').value.trim();
+    if (!claudeKey) {
+      showToast('Claude API 키를 입력해주세요', 'error');
+      return;
+    }
+
+    // UI
+    const emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.remove();
+
+    input.value = '';
+    input.style.height = 'auto';
+    isLoading = true;
+    document.getElementById('send-btn').disabled = true;
+
+    addMessage('user', question);
+    chatHistory.push({ role: 'user', content: question });
+
+    // Typing indicator
+    const typingId = addTyping();
+
+    // 문서 컨텍스트 구성
+    const context = loadedDocs.map(d =>
+      `## [${d.collection}] ${d.title}\n${d.content}`
+    ).join('\n\n---\n\n');
+
+    const systemPrompt = `당신은 HD Hyundai Oilbank의 내부 문서 시스템(HDocs)에 있는 EG 컬렉션 문서들을 기반으로 질문에 답변하는 AI 어시스턴트입니다.
+
+아래는 참고할 수 있는 모든 문서 내용입니다:
+
+${context}
+
+답변 규칙:
+- 문서 내용에 있는 정보만 바탕으로 답변하세요
+- 문서에 없는 내용은 "해당 내용은 문서에서 찾을 수 없어요"라고 솔직하게 말하세요
+- 한국어로 친절하고 명확하게 답변하세요
+- 관련 문서 이름을 언급해주세요`;
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': claudeKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1500,
+          system: systemPrompt,
+          messages: chatHistory
+        })
+      });
+
+      removeTyping(typingId);
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || `Claude API 오류 (${res.status})`);
+      }
+
+      const data = await res.json();
+      const answer = data.content[0]?.text || '답변을 받지 못했어요.';
+
+      addMessage('ai', answer);
+      chatHistory.push({ role: 'assistant', content: answer });
+
+    } catch (err) {
+      removeTyping(typingId);
+      addMessage('ai', `⚠️ 오류가 발생했어요: ${err.message}`);
+      showToast(err.message, 'error');
+    } finally {
+      isLoading = false;
+      if (loadedDocs.length > 0) {
+        document.getElementById('send-btn').disabled = false;
+      }
+      document.getElementById('question-input').focus();
+    }
+  }
+
+  // ── Chat UI helpers ──
+  function addMessage(role, text) {
+    const chat = document.getElementById('chat-area');
+    const msg = document.createElement('div');
+    msg.className = `message ${role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'msg-avatar';
+    avatar.textContent = role === 'user' ? '나' : 'AI';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.innerHTML = formatText(text);
+
+    msg.appendChild(avatar);
+    msg.appendChild(bubble);
+    chat.appendChild(msg);
+    chat.scrollTop = chat.scrollHeight;
+    return msg;
+  }
+
+  function addTyping() {
+    const chat = document.getElementById('chat-area');
+    const id = 'typing-' + Date.now();
+    const msg = document.createElement('div');
+    msg.className = 'message ai';
+    msg.id = id;
+    msg.innerHTML = `
+      <div class="msg-avatar">AI</div>
+      <div class="msg-bubble">
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>`;
+    chat.appendChild(msg);
+    chat.scrollTop = chat.scrollHeight;
+    return id;
+  }
+
+  function removeTyping(id) {
+    document.getElementById(id)?.remove();
+  }
+
+  function formatText(text) {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/`(.*?)`/g, '<code>$1</code>')
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/^/, '<p>')
+      .replace(/$/, '</p>')
+      .replace(/<p><ul>/g, '<ul>')
+      .replace(/<\/ul><\/p>/g, '</ul>');
+  }
+</script>
+</body>
+</html>
